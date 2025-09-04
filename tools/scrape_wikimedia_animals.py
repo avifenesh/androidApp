@@ -2,10 +2,21 @@
 """
 Scrape Creative Commons animal images from Wikimedia Commons categories.
 
-Usage:
+Usage examples:
+  # Single category
   python tools/scrape_wikimedia_animals.py \
-      --category "Category:Animal portraits" \
-      --limit 50 \
+      --category "Category:Featured pictures of mammals" \
+      --limit 150 \
+      --out app/src/main/assets/animals
+
+  # Multiple categories with keyword filters
+  python tools/scrape_wikimedia_animals.py \
+      --category "Category:Featured pictures of mammals" \
+      --category "Category:Featured pictures of birds" \
+      --include "cat,dog,elephant,giraffe,zebra,lion,tiger,bear,horse,cow,goat,sheep,fox,monkey,panda,koala,bird,parrot,peacock,penguin" \
+      --exclude "jellyfish,coral,anemone,urchin,starfish,octopus,squid,shrimp,crab,sponge,cnidaria,ctenophora,fish,marine,sea,worm,spider,mite,tick,insect,mosquito" \
+      --exclude-ext ".svg" \
+      --limit 300 \
       --out app/src/main/assets/animals
 
 Notes:
@@ -116,16 +127,31 @@ def sanitize_filename(name: str) -> str:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--category", required=True, help="Wikimedia Commons category (e.g., 'Category:Animal portraits')")
+    ap.add_argument("--category", action="append", required=True, help="Wikimedia Commons category; repeatable")
     ap.add_argument("--out", required=True, help="Output folder for images")
     ap.add_argument("--limit", type=int, default=50, help="Max number of images")
+    ap.add_argument("--include", default="", help="Comma-separated keywords to prefer (optional)")
+    ap.add_argument("--exclude", default="", help="Comma-separated keywords to skip")
+    ap.add_argument("--exclude-ext", default=".svg", help="Comma-separated file extensions to skip (e.g., .svg,.tif)")
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
     meta_path = os.path.join(os.path.dirname(args.out.rstrip("/")), "animals_metadata.csv")
-    titles = [m["title"] for m in fetch_category_files_recursive(args.category, args.limit)]
+    include_kw = [s.strip().lower() for s in args.include.split(",") if s.strip()]
+    exclude_kw = [s.strip().lower() for s in args.exclude.split(",") if s.strip()]
+    exclude_ext = [s.strip().lower() for s in args.exclude_ext.split(",") if s.strip()]
+
+    # Gather files from all categories up to limit
+    titles: list[str] = []
+    for cat in args.category:
+        remaining = args.limit - len(titles)
+        if remaining <= 0:
+            break
+        files = fetch_category_files_recursive(cat, remaining)
+        titles.extend([m["title"] for m in files])
+    titles = list(dict.fromkeys(titles))  # de-dup while preserving order
     if not titles:
-        print("No images found for:", args.category)
+        print("No images found for:", ", ".join(args.category))
         return
     info = fetch_image_info(titles)
 
@@ -133,6 +159,7 @@ def main():
         writer = csv.writer(f)
         writer.writerow(["filename", "source_url", "license", "artist", "credit"])
         downloaded = 0
+        kept = 0
         for title, ii in info.items():
             url = ii.get("url")
             width = ii.get("width", 0)
@@ -140,6 +167,16 @@ def main():
             if not url or (width < 640 and height < 640):
                 continue
             base = sanitize_filename(os.path.basename(url))
+            # Extension filter
+            if any(base.lower().endswith(ext) for ext in exclude_ext):
+                continue
+            # Keyword filters on filename and title
+            title_l = (title or "").lower() + " " + base.lower()
+            if exclude_kw and any(k in title_l for k in exclude_kw):
+                continue
+            if include_kw and not any(k in title_l for k in include_kw):
+                # If include list provided, skip non-matching
+                continue
             out_path = os.path.join(args.out, base)
             try:
                 r = requests.get(url, headers=UA, timeout=60)
@@ -152,10 +189,11 @@ def main():
                 credit = (meta.get("Credit", {}).get("value") or "").strip()
                 writer.writerow([base, url, license_short, artist, credit])
                 downloaded += 1
+                kept += 1
                 print(f"Saved {base}")
             except Exception as e:
                 print("Failed ", url, e)
-        print(f"Downloaded {downloaded} images to {args.out}")
+        print(f"Downloaded {downloaded} images to {args.out}; kept {kept} after filters")
 
 if __name__ == "__main__":
     main()
