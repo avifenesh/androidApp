@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kid Animals</string>
+    <string name="exit">Exit</string>
+    <string name="parent_exit">Parent Exit</string>
+    <string name="swipe_to_exit">Swipe up to exit</string>
+    <string name="exit_hint">Long-press the exit then swipe up</string>
+    <string name="unpin_instructions">If still pinned, use system unpin: Back + Home (buttons) or swipe up and hold (gestures).</string>
+</resources>
+

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/overlay_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/overlay_dim">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:id="@+id/exit_instructions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/swipe_to_exit"
+            android:textColor="@android:color/white"
+            android:textSize="18sp"
+            android:paddingBottom="16dp" />
+
+        <FrameLayout
+            android:id="@+id/swipe_container"
+            android:layout_width="match_parent"
+            android:layout_height="140dp"
+            android:background="@drawable/rounded_bg">
+
+            <TextView
+                android:id="@+id/swipe_handle"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_gravity="bottom"
+                android:gravity="center"
+                android:text="▲"
+                android:textColor="@android:color/white"
+                android:textSize="24sp" />
+
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/unpin_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/unpin_instructions"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            android:paddingTop="12dp" />
+
+    </LinearLayout>
+
+</FrameLayout>
+
