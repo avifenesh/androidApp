@@ -1,0 +1,43 @@
+# macOS
+.DS_Store
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+
+# Python (tools/)
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Gradle
+.gradle/
+build/
+*/build/
+.externalNativeBuild/
+.cxx/
+local.properties
+
+# Android/Studio outputs
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+captures/
+
+# Signing artifacts (keep keystore files out of VCS)
+*.jks
+*.keystore
+keystore.properties
+
+# Logs and reports
+*.log
+lint/outputs/
+lint/reports/
+
+# Node (just in case)
+node_modules/
+

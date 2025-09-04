@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import android.view.*
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
@@ -32,12 +33,16 @@ class MainActivity : ComponentActivity() {
         exitBtn = findViewById(R.id.btn_exit)
 
         pager.adapter = ImagePagerAdapter(this, images)
+        // Optimize RecyclerView if items don't change size
+        (pager.getChildAt(0) as? RecyclerView)?.setHasFixedSize(true)
 
         thumbs.layoutManager = LinearLayoutManager(this, RecyclerView.VERTICAL, false)
         val thumbAdapter = ThumbnailAdapter(this, images) { position ->
             pager.currentItem = position
         }
         thumbs.adapter = thumbAdapter
+        // Optimize RecyclerView if items don't change size
+        thumbs.setHasFixedSize(true)
 
         exitBtn.setOnLongClickListener {
             showExitOverlay()
@@ -91,7 +96,12 @@ class MainActivity : ComponentActivity() {
     private fun loadAssetImages(context: Context): List<String> {
         val dir = "animals"
         val files = context.assets.list(dir)?.toList().orEmpty()
-            .filter { it.endsWith(".jpg", true) || it.endsWith(".jpeg", true) || it.endsWith(".png", true) }
+            .filter {
+                it.endsWith(".jpg", true) ||
+                it.endsWith(".jpeg", true) ||
+                it.endsWith(".png", true) ||
+                it.endsWith(".webp", true)
+            }
             .sorted()
         return files.map { "$dir/$it" }
     }
@@ -109,7 +119,7 @@ class ImagePagerAdapter(private val context: Context, private val assets: List<S
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val assetPath = assets[position]
-        holder.image.setImageBitmap(loadBitmapFromAssets(context, assetPath, maxDim = 2000))
+        holder.image.setImageBitmap(loadBitmapFromAssets(context, assetPath, maxDim = 1600))
     }
 
     override fun getItemCount(): Int = assets.size
@@ -207,4 +217,3 @@ class ExitOverlayView(context: Context, private val onConfirmed: () -> Unit) : F
         }
     }
 }
-
