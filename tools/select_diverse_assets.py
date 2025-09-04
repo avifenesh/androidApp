@@ -30,7 +30,7 @@ ANIMAL_TOKENS = {
     # Others
     "kangaroo","wallaby","badger","otter","raccoon","skunk","hyena","weasel","marten","beaver","hare","rabbit","capybara",
     # Birds (optional present in set)
-    "bird","eagle","hawk","falcon","owl","duck","goose","swan","peacock","parrot","macaw","penguin","puffin","ibis","crane","heron","egret","kingfisher","hoopoe","bee","bee-eater","bulbul","woodpecker","starling","sparrow","finch","tern",
+    "bird","eagle","hawk","falcon","owl","duck","goose","swan","peacock","parrot","macaw","penguin","puffin","ibis","crane","heron","egret","kingfisher","hoopoe","bulbul","woodpecker","starling","sparrow","finch","tern",
 }
 
 STOPWORDS = {
@@ -62,21 +62,110 @@ def main():
     ap.add_argument("--limit", type=int, default=80, help="Max total images to keep")
     ap.add_argument("--per-animal-max", type=int, default=3, help="Max images per animal key")
     ap.add_argument("--prune", action="store_true", help="Delete non-selected files")
+    ap.add_argument("--quota", default="", help="Comma-separated quotas like lion=2,tiger=2,parrot=2")
+    ap.add_argument("--ensure", default="", help="Comma-separated tokens to ensure at least 1 if available (e.g., leopard,elephant,buffalo,cheetah,wilddog)")
+    ap.add_argument("--birds-min", type=int, default=0, help="Ensure at least this many bird images if available")
     args = ap.parse_args()
 
     files = [f for f in os.listdir(args.dir) if not f.startswith('.')]
     files.sort()
-    selected = []
-    per = defaultdict(int)
+    selected: list[str] = []
+    per: dict[str,int] = defaultdict(int)
 
-    for f in files:
+    # Synonyms mapping to canonical tokens
+    synonyms = {
+        "giraff": "giraffe",
+        "giraffes": "giraffe",
+        "zebras": "zebra",
+        "rinors": "rhino",
+        "rino": "rhino",
+        "rhinoceros": "rhino",
+        "rhinoceroses": "rhino",
+        "parots": "parrot",
+        "parrots": "parrot",
+        "monkeys": "monkey",
+        "lions": "lion",
+        "tigers": "tiger",
+        "cows": "cow",
+        "snakes": "snake",
+        "wild": "wilddog",  # heuristic for African wild dog filenames
+        "dog": "wilddog"     # careful: maps generic dog to wilddog only for ensure/quota parsing
+    }
+
+    def canon(tok: str) -> str:
+        t = tok.strip().lower()
+        return synonyms.get(t, t)
+
+    # Parse quotas map
+    quotas: dict[str,int] = {}
+    if args.quota.strip():
+        for pair in args.quota.split(','):
+            if not pair.strip():
+                continue
+            if '=' in pair:
+                k, v = pair.split('=', 1)
+                try:
+                    quotas[canon(k)] = max(0, int(v))
+                except ValueError:
+                    continue
+
+    ensure_tokens = [canon(t) for t in args.ensure.split(',') if t.strip()]
+
+    # Precompute keys for files
+    file_keys = [(f, animal_key_from_name(f)) for f in files]
+
+    # 1) Satisfy explicit quotas first
+    if quotas:
+        for want_key, want_n in quotas.items():
+            if want_n <= 0:
+                continue
+            for f, k in file_keys:
+                if len(selected) >= args.limit:
+                    break
+                if per.get(k, 0) >= args.per_animal_max:
+                    continue
+                if k == want_key and f not in selected:
+                    selected.append(f)
+                    per[k] = per.get(k, 0) + 1
+                    if per[k] >= want_n:
+                        break
+
+    # 2) Ensure certain tokens at least once
+    for tok in ensure_tokens:
         if len(selected) >= args.limit:
             break
-        key = animal_key_from_name(f)
-        if per[key] >= args.per_animal_max:
+        if per.get(tok, 0) > 0:
+            continue
+        for f, k in file_keys:
+            if k == tok and f not in selected:
+                selected.append(f)
+                per[k] = per.get(k, 0) + 1
+                break
+
+    # Helper to check bird tokens
+    bird_tokens = {"bird","eagle","hawk","falcon","owl","duck","goose","swan","peacock","parrot","macaw","penguin","puffin","ibis","crane","heron","egret","kingfisher","hoopoe","bulbul","woodpecker","starling","sparrow","finch","tern"}
+
+    # 3) Fill to birds-min with bird images
+    if args.birds_min > 0:
+        for f, k in file_keys:
+            if len(selected) >= args.limit:
+                break
+            if len([1 for s in selected if animal_key_from_name(s) in bird_tokens]) >= args.birds_min:
+                break
+            if k in bird_tokens and per.get(k, 0) < args.per_animal_max and f not in selected:
+                selected.append(f)
+                per[k] = per.get(k, 0) + 1
+
+    # 4) Fill the rest up to limit with diverse items respecting per-animal-max
+    for f, k in file_keys:
+        if len(selected) >= args.limit:
+            break
+        if per.get(k, 0) >= args.per_animal_max:
+            continue
+        if f in selected:
             continue
         selected.append(f)
-        per[key] += 1
+        per[k] = per.get(k, 0) + 1
 
     if args.prune:
         keep = set(selected)
@@ -97,4 +186,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
